@@ -11,6 +11,6 @@ const {
 
 router.post("/productsUpload", upload.any(), uploadProducts);
 router.post("/uploadReviewsById", upload.any(), uploadReviewsById);
-router.get("getProducts", getProducts);
+router.get("/getProducts", getProducts);
 
 module.exports = router;
