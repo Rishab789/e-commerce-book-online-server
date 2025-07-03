@@ -17,10 +17,31 @@ const PORT = process.env.PORT || 8000;
 const cloudinary = require("./config/cloudinary");
 cloudinary.cloudinaryConnect();
 
+const allowedOrigins = [
+  "http://localhost:1234",
+  "https://novelez-prod.netlify.app/",
+];
+
+// app.use(
+//   cors({
+//     origin: process.env.ORIGIN, // Allow only your frontend's origin
+//     methods: "GET, POST, PUT, DELETE",
+//     credentials: true,
+//   })
+// );
+
 app.use(
   cors({
-    origin: process.env.ORIGIN, // Allow only your frontend's origin
-    methods: "GET, POST, PUT, DELETE",
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error("Not allowed by CORS"));
+      }
+    },
+    methods: "GET,POST,PUT,DELETE",
     credentials: true,
   })
 );
