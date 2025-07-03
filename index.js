@@ -19,7 +19,7 @@ cloudinary.cloudinaryConnect();
 
 const allowedOrigins = [
   "http://localhost:1234",
-  "https://novelez-prod.netlify.app/",
+  "https://novelez-prod.netlify.app",
 ];
 
 // app.use(
