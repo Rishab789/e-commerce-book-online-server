@@ -24,29 +24,31 @@ function getOrderId() {
 
 // Payment handler
 exports.payment = async (req, res) => {
-  try {
-    const request = {
-      order_amount: 1,
-      order_currency: "INR",
-      order_id: getOrderId(),
-      customer_details: {
-        customer_id: "node_sdk_test",
-        customer_name: "John Doe",
-        customer_email: "example@gmail.com",
-        customer_phone: "9999999999",
-      },
-      order_meta: {
-        return_url:
-          "https://test.cashfree.com/pgappsdemos/return.php?order_id=order_123",
-      },
-    };
+  res.json({ success: true, message: "Payment route working" });
 
-    const response = await pg.orders.createOrder(request);
-    res.json(response.data);
-  } catch (err) {
-    console.error("Order creation error:", err?.response?.data || err.message);
-    res.status(500).send("Payment creation failed.");
-  }
+  //   try {
+  //     const request = {
+  //       order_amount: 1,
+  //       order_currency: "INR",
+  //       order_id: getOrderId(),
+  //       customer_details: {
+  //         customer_id: "node_sdk_test",
+  //         customer_name: "John Doe",
+  //         customer_email: "example@gmail.com",
+  //         customer_phone: "9999999999",
+  //       },
+  //       order_meta: {
+  //         return_url:
+  //           "https://test.cashfree.com/pgappsdemos/return.php?order_id=order_123",
+  //       },
+  //     };
+
+  //     const response = await pg.orders.createOrder(request);
+  //     res.json(response.data);
+  //   } catch (err) {
+  //     console.error("Order creation error:", err?.response?.data || err.message);
+  //     res.status(500).send("Payment creation failed.");
+  //   }
 };
 
 // Verification handler (empty for now)
