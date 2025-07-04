@@ -58,6 +58,7 @@ const bestSelling = require("./routes/bestSellingRoutes");
 const products = require("./routes/productsRoutes");
 const blogs = require("./routes/blog.routes");
 const mail = require("./routes/mail");
+const pay = require("./routes/paymentRoutes");
 
 app.use("/api/v1", user);
 app.use("/api/v1", otpMail);
@@ -66,6 +67,7 @@ app.use("/api/v1", bestSelling);
 app.use("/api/v1", products);
 app.use("/api/v1", blogs);
 app.use("/api/v1", mail);
+app.use("/api/v1", pay);
 
 app.listen(PORT, () => {
   console.log(`App started on port number ${PORT}`);
