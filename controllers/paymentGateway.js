@@ -1,4 +1,6 @@
 const crypto = require("crypto");
+require("dotenv").config();
+
 const { Cashfree, CashfreePG, CFEnvironment } = require("cashfree-pg");
 
 // Create config instance
