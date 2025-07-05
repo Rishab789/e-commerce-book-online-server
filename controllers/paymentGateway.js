@@ -1,61 +1,66 @@
-const crypto = require("crypto");
 require("dotenv").config();
+const crypto = require("crypto");
+const { Cashfree, CFEnvironment } = require("cashfree-pg"); // Import the whole module
 
-const { Cashfree, CashfreePG, CFEnvironment } = require("cashfree-pg");
+// const cfConfig = {
+//   env: Cashfree.CFEnvironment.SANDBOX, // or Cashfree.CFEnvironment.PRODUCTION
+//   clientId: process.env.CLIENT_ID,
+//   clientSecret: process.env.CLIENT_SECRET,
+// };
 
-// Create config instance
-const cfConfig = new Cashfree.CFConfig(
+const cashfree = new Cashfree(
   CFEnvironment.SANDBOX,
   process.env.CLIENT_ID,
   process.env.CLIENT_SECRET
 );
 
-// Initialize PG client
-const pg = new CashfreePG(cfConfig);
+// const pg = Cashfree.CFPaymentGateway(cfConfig); // Use as a function, not a constructor
 
-// Generate a random order ID
 function getOrderId() {
   const uniqueId = crypto.randomBytes(16).toString("hex");
   const hash = crypto.createHash("sha256");
   hash.update(uniqueId);
-  const orderId = hash.digest("hex");
-  return orderId.substr(0, 12); // Return 12-char order ID
+  return hash.digest("hex").substring(0, 12);
 }
 
-// Payment handler
 exports.payment = async (req, res) => {
-  res.json({ success: true, message: "Payment route working" });
+  try {
+    const request = {
+      order_amount: 1,
+      order_currency: "INR",
+      order_id: getOrderId(),
+      customer_details: {
+        customer_id: "node_sdk_test",
+        customer_name: "Test User",
+        customer_email: "example@gmail.com",
+        customer_phone: "9999999999",
+      },
+      order_meta: {
+        return_url:
+          "https://test.cashfree.com/pgappsdemos/return.php?order_id=order_123",
+      },
+    };
 
-  //   try {
-  //     const request = {
-  //       order_amount: 1,
-  //       order_currency: "INR",
-  //       order_id: getOrderId(),
-  //       customer_details: {
-  //         customer_id: "node_sdk_test",
-  //         customer_name: "John Doe",
-  //         customer_email: "example@gmail.com",
-  //         customer_phone: "9999999999",
-  //       },
-  //       order_meta: {
-  //         return_url:
-  //           "https://test.cashfree.com/pgappsdemos/return.php?order_id=order_123",
-  //       },
-  //     };
+    // ✅ Wait for the response properly
+    const response = await cashfree.PGCreateOrder(request);
 
-  //     const response = await pg.orders.createOrder(request);
-  //     res.json(response.data);
-  //   } catch (err) {
-  //     console.error("Order creation error:", err?.response?.data || err.message);
-  //     res.status(500).send("Payment creation failed.");
-  //   }
+    console.log("✅ Order created:", response.data);
+    res.json(response.data); // ✅ Now it's defined
+  } catch (error) {
+    console.error("❌ Payment Error:", error.response?.data || error.message);
+    res.status(500).json({ success: false, message: "Payment failed" });
+  }
 };
 
 // Verification handler (empty for now)
 exports.verify = async (req, res) => {
   try {
-    res.send("Verify logic to be implemented");
+    let { orderId } = req.body;
+
+    Cashfree.PGOrderFetchPayments("05-07-2025", orderId).then((response) => {
+      res.json(response.data);
+    });
   } catch (err) {
-    res.status(500).send("Verification failed.");
+    console.log(err);
   }
 };
