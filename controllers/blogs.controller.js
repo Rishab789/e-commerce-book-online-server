@@ -1,5 +1,21 @@
 const blogSchema = require("./../models/blog.model");
 
+exports.getBlogs = async (req, res) => {
+  try {
+    const blogData = await blogSchema.find();
+    res.json({
+      response: blogData,
+      success: true,
+      message: "Blogs Successfully fetched",
+    });
+  } catch (err) {
+    return res.status(501).json({
+      success: false,
+      message: "some Issue from the API",
+    });
+  }
+};
+
 exports.uploadBlogs = async (req, res) => {
   try {
     const formData = req.body;

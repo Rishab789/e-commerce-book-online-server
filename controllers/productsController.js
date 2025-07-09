@@ -73,7 +73,7 @@ exports.getProducts = async (req, res) => {
       message: "Products fetched",
     });
   } catch (error) {
-    return res.status(401).json({
+    return res.status(501).json({
       success: false,
       message: "some Issue from the API",
     });
