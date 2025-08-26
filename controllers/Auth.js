@@ -80,7 +80,7 @@ exports.login = async (req, res) => {
 
     if (await bcrypt.compare(password, user.password)) {
       let token = jwt.sign(payload, process.env.JWT_SECRET, {
-        expiresIn: "2h",
+        expiresIn: "24h",
       });
 
       console.log("JWT_SECRET:", process.env.JWT_SECRET);
