@@ -2,8 +2,10 @@ const bcrypt = require("bcrypt");
 const User = require("./../models/User");
 const jwt = require("jsonwebtoken");
 const { options } = require("../routes/user");
+const { OAuth2Client } = require("google-auth-library");
 
 require("dotenv").config();
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 //Sign Up Route Handler
 
@@ -114,6 +116,86 @@ exports.login = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Login Failure",
+    });
+  }
+};
+
+exports.googleLogin = async (req, res) => {
+  try {
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({
+        success: false,
+        message: "Google credential is required",
+      });
+    }
+
+    // Verify the Google JWT token
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { email, name, picture, email_verified } = payload;
+
+    if (!email_verified) {
+      return res.status(400).json({
+        success: false,
+        message: "Google email is not verified",
+      });
+    }
+
+    // Check if user exists or create new user
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // Create new user with Google data
+      user = await User.create({
+        email,
+        name: name || "Google User", // ✅ Use 'name' instead
+        avatar: picture,
+        role: "Customer", // ✅ Use valid enum value
+        isGoogleUser: true,
+      });
+    }
+
+    // Create JWT payload exactly like in regular login
+    const jwtPayload = {
+      email: user.email,
+      id: user._id,
+      role: user.role,
+    };
+
+    // Generate JWT token with same settings as regular login
+    const token = jwt.sign(jwtPayload, process.env.JWT_SECRET, {
+      expiresIn: "24h",
+    });
+
+    // Prepare user object (remove sensitive data)
+    user = user.toObject();
+    user.token = token;
+    user.password = undefined;
+
+    // Set cookie options exactly like regular login
+    const options = {
+      expires: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+      httpOnly: true,
+    };
+
+    // Send response exactly like regular login
+    res.cookie("token", token, options).status(200).json({
+      success: true,
+      token,
+      user,
+      message: "Google login successful",
+    });
+  } catch (error) {
+    console.error("Google login error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error,
     });
   }
 };

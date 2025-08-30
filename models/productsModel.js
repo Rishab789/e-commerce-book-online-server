@@ -39,6 +39,10 @@ const productSchema = new mongoose.Schema({
   featured: {
     type: String,
   },
+  type: {
+    type: String,
+    required: false,
+  },
 
   reviewsContent: [
     {

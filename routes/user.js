@@ -3,10 +3,16 @@ const router = express.Router();
 
 const User = require("./../models/User");
 
-const { login, signup, passwordReset } = require("../controllers/Auth");
+const {
+  login,
+  signup,
+  passwordReset,
+  googleLogin,
+} = require("../controllers/Auth");
 const { auth, isVisitor, isCustomer, isAdmin } = require("../middlewares/auth");
 
 router.post("/login", login);
+router.post("/googleLogin", googleLogin);
 router.post("/signup", signup);
 router.post("/passwordReset", passwordReset);
 

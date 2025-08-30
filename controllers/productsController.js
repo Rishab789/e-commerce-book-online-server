@@ -26,6 +26,7 @@ exports.uploadProducts = async (req, res) => {
       details: formData.details,
       genre: formData.genre,
       featured: formData.featured,
+      type: "book",
     };
 
     console.log("data", dataToSave);
@@ -84,7 +85,8 @@ exports.uploadReviewsById = async (req, res) => {
   try {
     const { username, review, stars, id } = req.body;
     const products = await productSchema.findByIdAndUpdate(id);
-    console.log("this is the products", products);
+    console.log("this is the book products", products);
+
     const obj = new Object();
     obj.username = username;
     obj.review = review;
@@ -102,9 +104,9 @@ exports.uploadReviewsById = async (req, res) => {
       message: "Reviews Uploaded Successfully!",
     });
   } catch (err) {
-    return res.status(401).json({
+    return res.status(501).json({
       success: false,
-      message: "Error coming from Server Side",
+      message: err,
       error: err,
     });
   }
