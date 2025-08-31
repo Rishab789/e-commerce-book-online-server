@@ -8,12 +8,14 @@ const {
   signup,
   passwordReset,
   googleLogin,
+  verifyEmail,
 } = require("../controllers/Auth");
 const { auth, isVisitor, isCustomer, isAdmin } = require("../middlewares/auth");
 
 router.post("/login", login);
 router.post("/googleLogin", googleLogin);
 router.post("/signup", signup);
+router.get("/verify-email/:token", verifyEmail);
 router.post("/passwordReset", passwordReset);
 
 // Testing Protected Route

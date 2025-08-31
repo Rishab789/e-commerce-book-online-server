@@ -1,7 +1,8 @@
 const bcrypt = require("bcrypt");
 const User = require("./../models/User");
 const jwt = require("jsonwebtoken");
-const { options } = require("../routes/user");
+const nodemailer = require("nodemailer");
+// const { options } = require("../routes/user");
 const { OAuth2Client } = require("google-auth-library");
 
 require("dotenv").config();
@@ -33,24 +34,113 @@ exports.signup = async (req, res) => {
       });
     }
 
-    // create User in DB
-    const user = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      role,
+    // // create User in DB
+    // const user = await User.create({
+    //   name,
+    //   email,
+    //   password: hashedPassword,
+    //   role,
+    //   isVerified: false,
+    // });
+
+    // Generate verification token (valid for 1 hour)
+    const token = jwt.sign(
+      {
+        name,
+        email,
+        password: hashedPassword, // Store hashed password in token
+        role,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    // Verification URL (frontend route)
+    const verifyUrl = `${process.env.ORIGIN}/verify-email/${token}`;
+
+    // Send verification email
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.MY_EMAIL,
+        pass: process.env.MY_PASSWORD,
+      },
+    });
+
+    await transporter.sendMail({
+      from: `"NovelEz" <${process.env.MY_EMAIL}>`,
+      to: email,
+      subject: "Verify your email",
+      html: `<p>Hello ${name},</p>
+             <p>Please verify your email by clicking the link below:</p>
+             <a href="${verifyUrl}">Verify Email</a>`,
     });
 
     return res.status(200).json({
       success: true,
-      message: "User Created Successfully",
+      message:
+        "Verification email sent! Please check your inbox and click the verification link to complete your registration.",
     });
   } catch (err) {
     console.log(err);
     return res.status(500).json({
       success: false,
-      message: "User cannot be registered, please try again later",
+      message: "Registration failed, please try again later",
     });
+  }
+};
+
+exports.verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    // Verify and decode the JWT token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Check if user already exists (in case they click the link multiple times)
+    const existingUser = await User.findOne({ email: decoded.email });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: "Account already exists. Please login instead.",
+      });
+    }
+
+    // ✅ NOW CREATE THE USER ACCOUNT
+    const user = await User.create({
+      name: decoded.name,
+      email: decoded.email,
+      password: decoded.password, // Already hashed
+      role: decoded.role,
+      isVerified: true, // Account is verified upon creation
+    });
+
+    console.log("✅ User account created successfully:", user.email);
+
+    res.status(200).json({
+      success: true,
+      message:
+        "Email verified successfully! Your account has been created. You can now login.",
+    });
+  } catch (err) {
+    console.log("❌ Email verification failed:", err);
+
+    if (err.name === "TokenExpiredError") {
+      res.status(400).json({
+        success: false,
+        message: "Verification link has expired. Please sign up again.",
+      });
+    } else if (err.name === "JsonWebTokenError") {
+      res.status(400).json({
+        success: false,
+        message: "Invalid verification link.",
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: "Verification failed. Please try signing up again.",
+      });
+    }
   }
 };
 
