@@ -314,3 +314,30 @@ exports.passwordReset = async (req, res, next) => {
       .json({ message: "Something went wrong from reset password controller" });
   }
 };
+
+exports.getUser = async (req, res) => {
+  try {
+    const { id } = req.params; // userId will come from URL params like /api/v1/user/:id
+
+    // Find user by ID (excluding password field)
+    const user = await User.findById(id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      user,
+    });
+  } catch (err) {
+    console.error("❌ Error in getUser:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch user",
+    });
+  }
+};
