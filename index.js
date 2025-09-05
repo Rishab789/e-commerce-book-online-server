@@ -41,7 +41,7 @@ app.use(
         return callback(new Error("Not allowed by CORS"));
       }
     },
-    methods: "GET,POST,PUT,DELETE",
+    methods: "GET,POST,PUT,DELETE,PATCH",
     credentials: true,
   })
 );
@@ -60,6 +60,7 @@ const blogs = require("./routes/blog.routes");
 const mail = require("./routes/mail");
 const pay = require("./routes/paymentRoutes");
 const address = require("./routes/address.routes");
+const cart = require("./routes/cart.route");
 
 app.use("/api/v1", user);
 app.use("/api/v1", otpMail);
@@ -70,6 +71,7 @@ app.use("/api/v1", blogs);
 app.use("/api/v1", mail);
 app.use("/api/v1", pay);
 app.use("/api/v1", address);
+app.use("/api/v1", cart);
 
 app.listen(PORT, () => {
   console.log(`App started on port number ${PORT}`);
