@@ -147,3 +147,43 @@ exports.updateAddress = async (req, res) => {
     });
   }
 };
+
+// 📌 PATCH API: Set default address
+exports.setDefaultAddress = async (req, res) => {
+  try {
+    const { userId, addressId } = req.body;
+
+    // First, unset the current default
+    await Address.updateMany(
+      { user: userId, isDefault: true },
+      { $set: { isDefault: false } }
+    );
+
+    // Then set the new one
+    const updatedAddress = await Address.findOneAndUpdate(
+      { _id: addressId, user: userId },
+      { $set: { isDefault: true } },
+      { new: true }
+    );
+
+    if (!updatedAddress) {
+      return res.status(404).json({
+        success: false,
+        message: "Address not found or not authorized",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Default address updated successfully!",
+      updatedAddress,
+    });
+  } catch (err) {
+    console.error("Error setting default address:", err);
+    res.status(500).json({
+      success: false,
+      message: "An error occurred while setting default address",
+      error: err.message,
+    });
+  }
+};
