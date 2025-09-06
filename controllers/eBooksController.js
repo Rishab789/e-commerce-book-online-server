@@ -86,32 +86,32 @@ exports.getAllPosts = async (req, res) => {
   }
 };
 
-// exports.uploadReviewsEbbokById = async (req, res) => {
-//   try {
-//     const { username, review, stars, id } = req.body;
-//     const ebooks = await eBookSchema.findByIdAndUpdate(id);
-//     console.log("this is the e-books products", ebooks);
-//     const obj = new Object();
-//     obj.username = username;
-//     obj.review = review;
-//     obj.stars = stars;
-//     console.log("this is the Object", obj);
+exports.uploadReviewsEbookById = async (req, res) => {
+  try {
+    const { username, review, stars, id } = req.body;
+    const ebooks = await eBookSchema.findByIdAndUpdate(id);
+    console.log("this is the e-books products", ebooks);
+    const obj = new Object();
+    obj.username = username;
+    obj.review = review;
+    obj.stars = stars;
+    console.log("this is the Object", obj);
 
-//     ebooks.reviewsContent.push(obj);
+    ebooks.reviewsContent.push(obj);
 
-//     const newPost = new eBookSchema(ebooks);
-//     const savedPost = await newPost.save();
+    const newPost = new eBookSchema(ebooks);
+    const savedPost = await newPost.save();
 
-//     res.status(200).json({
-//       post: savedPost,
-//       success: true,
-//       message: "Reviews Uploaded Successfully!",
-//     });
-//   } catch (err) {
-//     return res.status(501).json({
-//       success: false,
-//       message: "Error coming from Server Side",
-//       error: err,
-//     });
-//   }
-// };
+    res.status(200).json({
+      post: savedPost,
+      success: true,
+      message: "Reviews Uploaded Successfully!",
+    });
+  } catch (err) {
+    return res.status(501).json({
+      success: false,
+      message: "Error coming from Server Side",
+      error: err,
+    });
+  }
+};
