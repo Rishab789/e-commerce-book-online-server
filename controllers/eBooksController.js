@@ -6,9 +6,6 @@ exports.uploadEbook = async (req, res) => {
     const files = req.files;
     const formData = req.body;
 
-    console.log("this is files", files);
-    console.log("this is formDate", formData);
-
     // const { title, author, imageUrl, description, link, category } = req.body;
 
     const imageFile = files.find((file) => file.fieldname === "imageFile");
@@ -90,7 +87,6 @@ exports.uploadReviewsEbookById = async (req, res) => {
   try {
     const { username, review, stars, id } = req.body;
     const ebooks = await eBookSchema.findByIdAndUpdate(id);
-    console.log("this is the e-books products", ebooks);
     const obj = new Object();
     obj.username = username;
     obj.review = review;

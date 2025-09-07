@@ -85,7 +85,6 @@ exports.uploadReviewsById = async (req, res) => {
   try {
     const { username, review, stars, id } = req.body;
     const products = await productSchema.findByIdAndUpdate(id);
-    console.log("this is the book products", products);
 
     const obj = new Object();
     obj.username = username;

@@ -45,7 +45,6 @@ exports.addToCart = async (req, res) => {
 exports.getCart = async (req, res) => {
   try {
     const { userId } = req.params;
-    console.log("this is get cart user id ", userId);
 
     if (!userId) {
       return res.status(400).json({
@@ -71,7 +70,6 @@ exports.getCart = async (req, res) => {
 
 // ✅ Remove product from cart completely
 exports.removeFromCart = async (req, res) => {
-  console.log("this is req body ", req.body);
   try {
     const { userId, productId } = req.body; // Change parameter name
 

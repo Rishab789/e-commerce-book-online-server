@@ -3,7 +3,7 @@ const crypto = require("crypto");
 const { Cashfree, CFEnvironment } = require("cashfree-pg");
 
 const cashfree = new Cashfree(
-  CFEnvironment.SANDBOX,
+  CFEnvironment.PRODUCTION,
   process.env.CLIENT_ID,
   process.env.CLIENT_SECRET
 );
@@ -12,10 +12,11 @@ function getOrderId() {
   const uniqueId = crypto.randomBytes(16).toString("hex");
   const hash = crypto.createHash("sha256");
   hash.update(uniqueId);
-  return hash.digest("hex").substring(0, 12);
+  return hash.digest("hex").substr(0, 12);
 }
 
 exports.payment = async (req, res) => {
+  console.log("this is the payment integration ", req.body);
   try {
     const request = {
       order_amount: 1,
@@ -27,9 +28,10 @@ exports.payment = async (req, res) => {
         customer_email: "example@gmail.com",
         customer_phone: "9999999999",
       },
-      // order_meta: {
-      //   return_url: `http://localhost:1234/payment-success?order_id=${2195026866}`,
-      // },
+      order_meta: {
+        // return_url: `http://localhost:1234/payment-success?order_id=${await getOrderId()}`,
+        return_url: `https://novelez-prod.netlify.app/payment-success?order_id=${await getOrderId()}`,
+      },
     };
 
     const response = await cashfree.PGCreateOrder(request);
