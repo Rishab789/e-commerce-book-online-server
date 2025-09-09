@@ -463,6 +463,7 @@ exports.cancelOrder = async (req, res) => {
     );
 
     console.log("✅ Shiprocket cancel order response:", response.data);
+    console.log("✅ Shiprocket");
 
     if (response.data && response.data.status === 200) {
       // 3. Update the order status in MongoDB
