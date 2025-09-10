@@ -30,6 +30,7 @@ exports.storeShipment = async (
 exports.getShipmentsByUserId = async (userId) => {
   try {
     const shipments = await Shipment.find({ userId }).sort({ createdAt: -1 }); // Latest first
+    console.log("this is shipment ", shipments);
     return shipments;
   } catch (error) {
     console.error("❌ Error fetching shipments:", error);

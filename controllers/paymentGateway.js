@@ -7,6 +7,7 @@ const {
   getShipmentsByUserId,
   getShipmentByOrderId,
   updateShipmentStatus,
+  getShipmentByShipmentId,
 } = require("../services/shipmentServices");
 
 const cashfree = new Cashfree(
@@ -496,6 +497,153 @@ exports.cancelOrder = async (req, res) => {
     res.status(statusCode).json({
       success: false,
       message: "Failed to cancel order",
+      error: errorMessage,
+    });
+  }
+};
+
+// Get Tracking Details API
+// Get Tracking Details API - Modified to handle Shiprocket's response format
+exports.getTrackingDetails = async (req, res) => {
+  try {
+    const { user_id } = req.params;
+
+    console.log("Fetching tracking details for user:", user_id);
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
+    // 1. Get the user's shipments from MongoDB
+    const userShipments = await getShipmentsByUserId(user_id);
+
+    if (!userShipments || userShipments.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No shipments found for this user",
+      });
+    }
+
+    // Get the latest shipment (first in the sorted array)
+    const latestShipment = userShipments[0];
+    const shipment_id = latestShipment.shiprocketShipmentId;
+
+    console.log("Using latest shipment ID:", shipment_id);
+
+    const authToken = await getShiprocketAuthToken();
+
+    // 2. Call Shiprocket tracking API
+    const response = await axios.get(
+      `${SHIPROCKET_CONFIG.BASE_URL}/courier/track/shipment/${shipment_id}`,
+      {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    console.log("✅ Shiprocket tracking response:", response.data);
+
+    // Handle Shiprocket's response format
+    const trackingData = response.data[shipment_id]?.tracking_data;
+
+    if (trackingData) {
+      // Check if there's an error message from Shiprocket
+      if (trackingData.error && trackingData.error !== "") {
+        // Shipment exists but no tracking activities yet
+        res.json({
+          success: true,
+          data: {
+            shipment_id: shipment_id,
+            status: "PENDING",
+            message:
+              trackingData.error ||
+              "Shipment created but not yet picked up by courier",
+            track_status: trackingData.track_status,
+            shipment_status: trackingData.shipment_status,
+            is_return: trackingData.is_return,
+          },
+          user_id: user_id,
+          shipment_info: {
+            order_id: latestShipment.shiprocketOrderId,
+            created_at: latestShipment.createdAt,
+            cashfree_order_id: latestShipment.cashfreeOrderId,
+          },
+        });
+      } else if (
+        trackingData.shipment_track &&
+        trackingData.shipment_track.length > 0
+      ) {
+        // Shipment has tracking data
+        res.json({
+          success: true,
+          data: trackingData,
+          shipment_id: shipment_id,
+          user_id: user_id,
+          shipment_info: {
+            order_id: latestShipment.shiprocketOrderId,
+            created_at: latestShipment.createdAt,
+            cashfree_order_id: latestShipment.cashfreeOrderId,
+          },
+        });
+      } else {
+        // No tracking data available yet
+        res.json({
+          success: true,
+          data: {
+            shipment_id: shipment_id,
+            status: "PROCESSING",
+            message:
+              "Shipment is being processed. Tracking will be available soon.",
+            track_status: trackingData.track_status,
+            shipment_status: trackingData.shipment_status,
+          },
+          user_id: user_id,
+          shipment_info: {
+            order_id: latestShipment.shiprocketOrderId,
+            created_at: latestShipment.createdAt,
+            cashfree_order_id: latestShipment.cashfreeOrderId,
+          },
+        });
+      }
+    } else {
+      // No tracking data found at all
+      res.json({
+        success: true,
+        data: {
+          shipment_id: shipment_id,
+          status: "UNKNOWN",
+          message: "Shipment details not available yet",
+        },
+        user_id: user_id,
+        shipment_info: {
+          order_id: latestShipment.shiprocketOrderId,
+          created_at: latestShipment.createdAt,
+          cashfree_order_id: latestShipment.cashfreeOrderId,
+        },
+      });
+    }
+  } catch (error) {
+    console.error(
+      "❌ Tracking details error:",
+      error.response?.data || error.message
+    );
+
+    let errorMessage = error.message;
+    let statusCode = 500;
+
+    if (error.response && error.response.data) {
+      errorMessage = error.response.data.message || errorMessage;
+      statusCode = error.response.status || statusCode;
+    }
+
+    res.status(statusCode).json({
+      success: false,
+      message: "Failed to fetch tracking details",
       error: errorMessage,
     });
   }
