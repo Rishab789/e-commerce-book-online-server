@@ -3,7 +3,17 @@ const Cart = require("./../models/cartItemSchema ");
 // ✅ Add product to cart
 exports.addToCart = async (req, res) => {
   try {
-    const { userId, productId, title, image, price, quantity = 1 } = req.body;
+    const {
+      userId,
+      productId,
+      title,
+      image,
+      price,
+      quantity = 1,
+      type,
+    } = req.body;
+
+    console.log("cart products", req.body);
 
     // Validate required fields
     if (!userId || !productId || !title || !price) {
@@ -19,7 +29,7 @@ exports.addToCart = async (req, res) => {
       // Create new cart
       cart = new Cart({
         userId,
-        items: [{ productId, title, image, price, quantity }],
+        items: [{ productId, title, image, price, quantity, type }],
       });
     } else {
       // Check if product already exists in cart
@@ -30,7 +40,7 @@ exports.addToCart = async (req, res) => {
       if (existingItem) {
         existingItem.quantity += quantity; // update quantity
       } else {
-        cart.items.push({ productId, title, image, price, quantity });
+        cart.items.push({ productId, title, image, price, quantity, type });
       }
     }
 
