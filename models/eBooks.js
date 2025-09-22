@@ -34,6 +34,12 @@ const eBookSchema = new mongoose.Schema({
     type: String,
     required: false,
   },
+  s3Key: {
+    type: String,
+    required: function () {
+      return this.type === "ebook"; // Required only for eBooks
+    },
+  },
   reviewsContent: [
     {
       username: {

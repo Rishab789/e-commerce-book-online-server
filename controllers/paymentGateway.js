@@ -1,4 +1,6 @@
 require("dotenv").config();
+const { deliverEbooks } = require("./../services/ebookDeliveryService");
+
 const crypto = require("crypto");
 const { Cashfree, CFEnvironment } = require("cashfree-pg");
 const axios = require("axios"); // Added axios import
@@ -117,6 +119,18 @@ exports.verify = async (req, res) => {
 
     if (response.data.order_status === "PAID") {
       // Create Shiprocket order only if payment is successful
+      const ebookItems = orderData.products.filter(
+        (product) => product.type === "ebook"
+      );
+      if (ebookItems.length > 0) {
+        try {
+          await deliverEbooks(orderData.customer, ebookItems, order_id);
+          console.log("✅ eBooks delivered successfully");
+        } catch (ebookError) {
+          console.error("❌ eBook delivery failed:", ebookError);
+          // Handle eBook delivery failure (you might want to retry or notify admin)
+        }
+      }
 
       try {
         const shiprocketOrder = await createShiprocketOrder(
