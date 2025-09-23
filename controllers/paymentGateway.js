@@ -81,6 +81,8 @@ exports.orderPlace = async (req, res) => {
       },
     };
 
+    console.log("this is order place functions   ----> ", products);
+
     const cashfreeResponse = await cashfree.PGCreateOrder(orderData);
 
     if (cashfreeResponse.data.payment_session_id) {
@@ -119,9 +121,12 @@ exports.verify = async (req, res) => {
 
     if (response.data.order_status === "PAID") {
       // Create Shiprocket order only if payment is successful
+      console.log("payment status is paid");
       const ebookItems = orderData.products.filter(
         (product) => product.type === "ebook"
       );
+
+      console.log("this is ebbok items ", orderData);
       if (ebookItems.length > 0) {
         try {
           await deliverEbooks(orderData.customer, ebookItems, order_id);

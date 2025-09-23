@@ -1,43 +1,73 @@
 const AWS = require("aws-sdk");
 const nodemailer = require("nodemailer");
-const eBookModel = require("./../models/eBooks"); // Adjust path as needed
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const eBookModel = require("./../models/eBooks");
+const {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+} = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+const { v4: uuidv4 } = require("uuid");
 
-// Configure AWS
-AWS.config.update({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION,
-});
+// Configure AWS S3 client with error handling
+const createS3Client = () => {
+  try {
+    if (
+      !process.env.AWS_REGION ||
+      !process.env.AWS_ACCESS_KEY_ID ||
+      !process.env.AWS_SECRET_ACCESS_KEY
+    ) {
+      throw new Error("Missing required AWS environment variables");
+    }
 
-const s3 = new S3Client({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
-});
+    return new S3Client({
+      region: process.env.AWS_REGION,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error creating S3 client:", error);
+    throw error;
+  }
+};
 
-// Configure email transporter
+const s3 = createS3Client();
+
+// Configure email transporter with validation
 const createTransporter = () => {
-  return nodemailer.createTransporter({
-    service: "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD,
-    },
-  });
+  try {
+    if (!process.env.MY_EMAIL || !process.env.MY_PASSWORD) {
+      throw new Error("Missing email credentials in environment variables");
+    }
+
+    return nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.MY_EMAIL,
+        pass: process.env.MY_PASSWORD, // Should be App Password for Gmail
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error creating email transporter:", error);
+    throw error;
+  }
 };
 
 /**
  * Generate signed URL for S3 object
- * @param {String} s3Key - The S3 object key
- * @param {Number} expiresIn - Expiration time in seconds (default: 24 hours)
- * @returns {Promise<String>} - Signed URL
  */
 const generateSignedS3Url = async (s3Key, expiresIn = 60 * 60 * 24) => {
   try {
+    if (!process.env.S3_BUCKET_NAME) {
+      throw new Error("S3_BUCKET_NAME environment variable is not set");
+    }
+
+    if (!s3Key) {
+      throw new Error("S3 key is required");
+    }
+
     const command = new GetObjectCommand({
       Bucket: process.env.S3_BUCKET_NAME,
       Key: s3Key,
@@ -45,19 +75,31 @@ const generateSignedS3Url = async (s3Key, expiresIn = 60 * 60 * 24) => {
     });
 
     const signedUrl = await getSignedUrl(s3, command, { expiresIn });
+
+    if (!signedUrl) {
+      throw new Error("Failed to generate signed URL");
+    }
+
     return signedUrl;
   } catch (error) {
-    console.error("Error generating signed URL:", error);
-    throw new Error("Failed to generate download link");
+    console.error("❌ Error generating signed URL:", error.message);
+    throw new Error(`Failed to generate download link: ${error.message}`);
   }
 };
+
+/**
+ * Format file size to human readable format
+ */
+const formatFileSize = (bytes) => {
+  if (!bytes || bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+};
+
 /**
  * Send eBook download email to customer
- * @param {String} toEmail - Customer email
- * @param {String} customerName - Customer name
- * @param {Array} ebookItems - eBook items with download links
- * @param {String} orderId - Order ID
- * @returns {Promise<Object>} - Email sending result
  */
 const sendDownloadEmail = async (
   toEmail,
@@ -65,24 +107,32 @@ const sendDownloadEmail = async (
   ebookItems,
   orderId
 ) => {
-  const transporter = createTransporter();
-
-  const mailOptions = {
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-    to: toEmail,
-    subject: `Your eBook Download Links - Order #${orderId}`,
-    html: generateEmailTemplate(customerName, ebookItems, orderId),
-    // Optional: Text version for email clients that don't support HTML
-    text: generateTextEmail(customerName, ebookItems, orderId),
-  };
-
   try {
+    if (!toEmail || !customerName || !Array.isArray(ebookItems) || !orderId) {
+      throw new Error("Missing required parameters for sending email");
+    }
+
+    const transporter = createTransporter();
+
+    // Test connection before sending
+    await transporter.verify();
+
+    const mailOptions = {
+      from: process.env.MY_EMAIL,
+      to: toEmail,
+      subject: `Your eBook Download Links - Order #${orderId}`,
+      html: generateEmailTemplate(customerName, ebookItems, orderId),
+      text: generateTextEmail(customerName, ebookItems, orderId),
+    };
+
     const result = await transporter.sendMail(mailOptions);
-    console.log(`Download email sent to ${toEmail}`);
+    console.log(
+      `✅ Download email sent to ${toEmail}, MessageId: ${result.messageId}`
+    );
     return result;
   } catch (error) {
-    console.error("Error sending email:", error);
-    throw new Error("Failed to send download email");
+    console.error("❌ Error sending email:", error.message);
+    throw new Error(`Failed to send download email: ${error.message}`);
   }
 };
 
@@ -90,6 +140,10 @@ const sendDownloadEmail = async (
  * Generate HTML email template
  */
 const generateEmailTemplate = (customerName, ebookLinks, orderId) => {
+  if (!Array.isArray(ebookLinks)) {
+    ebookLinks = [];
+  }
+
   return `
     <!DOCTYPE html>
     <html>
@@ -137,7 +191,7 @@ const generateEmailTemplate = (customerName, ebookLinks, orderId) => {
       </div>
       
       <div class="content">
-        <p>Dear ${customerName},</p>
+        <p>Dear ${customerName || "Customer"},</p>
         <p>Thank you for your order <strong>#${orderId}</strong>. Your eBook(s) are ready for download.</p>
         
         <div class="expiry-note">
@@ -150,9 +204,14 @@ const generateEmailTemplate = (customerName, ebookLinks, orderId) => {
           .map(
             (ebook) => `
           <div class="ebook">
-            <h3>${ebook.title} by ${ebook.author}</h3>
-            <p>Format: ${ebook.format} | File Size: ${ebook.fileSize}</p>
+            <h3>${ebook.title || "Unknown Title"} by ${
+              ebook.author || "Unknown Author"
+            }</h3>
+            <p>Format: ${ebook.format || "PDF"} | File Size: ${
+              ebook.fileSize || "Unknown"
+            }</p>
             <a href="${ebook.downloadUrl}" class="button">Download eBook</a>
+            <p><small>Link expires: ${ebook.expiresIn || "24 hours"}</small></p>
           </div>
         `
           )
@@ -177,19 +236,28 @@ const generateEmailTemplate = (customerName, ebookLinks, orderId) => {
 };
 
 /**
- * Generate plain text email for clients that don't support HTML
+ * Generate plain text email
  */
 const generateTextEmail = (customerName, ebookLinks, orderId) => {
+  if (!Array.isArray(ebookLinks)) {
+    ebookLinks = [];
+  }
+
   let text = `Thank You for Your Purchase!\n\n`;
-  text += `Dear ${customerName},\n\n`;
+  text += `Dear ${customerName || "Customer"},\n\n`;
   text += `Thank you for your order #${orderId}. Your eBook(s) are ready for download.\n\n`;
   text += `IMPORTANT: These download links will expire in 24 hours.\n\n`;
   text += `Your eBook(s):\n\n`;
 
   ebookLinks.forEach((ebook) => {
-    text += `- ${ebook.title} by ${ebook.author}\n`;
-    text += `  Format: ${ebook.format} | File Size: ${ebook.fileSize}\n`;
-    text += `  Download: ${ebook.downloadUrl}\n\n`;
+    text += `- ${ebook.title || "Unknown Title"} by ${
+      ebook.author || "Unknown Author"
+    }\n`;
+    text += `  Format: ${ebook.format || "PDF"} | File Size: ${
+      ebook.fileSize || "Unknown"
+    }\n`;
+    text += `  Download: ${ebook.downloadUrl}\n`;
+    text += `  Expires: ${ebook.expiresIn || "24 hours"}\n\n`;
   });
 
   text += `If you have any issues with your download, please contact our support team.\n\n`;
@@ -204,35 +272,129 @@ const generateTextEmail = (customerName, ebookLinks, orderId) => {
 
 /**
  * Main function to deliver eBooks to customer
- * @param {Object} customer - Customer information
- * @param {Array} ebookItems - eBook items from order
- * @param {String} orderId - Order ID
- * @returns {Promise<Object>} - Delivery result
  */
 const deliverEbooks = async (customer, ebookItems, orderId) => {
   try {
+    // Validate input parameters
+    if (!customer || !customer.email) {
+      throw new Error("Customer information is missing or invalid");
+    }
+
+    if (!Array.isArray(ebookItems)) {
+      throw new Error("eBook items must be an array");
+    }
+
+    if (!orderId) {
+      throw new Error("Order ID is required");
+    }
+
+    console.log(
+      `📧 Starting eBook delivery for order ${orderId} to ${customer.email}`
+    );
+    console.log("📦 eBook items received:", ebookItems);
+
+    if (ebookItems.length === 0) {
+      console.log("⚠️ No eBook items provided for delivery");
+      return {
+        success: true,
+        delivered: 0,
+        message: "No eBooks in this order",
+        orderId: orderId,
+      };
+    }
+
+    // Validate eBooks exist before processing
+    const ebookValidation = await Promise.all(
+      ebookItems.map(async (item) => {
+        try {
+          if (!item.productId) {
+            return {
+              productId: "unknown",
+              exists: false,
+              title: "Unknown",
+              hasS3Key: false,
+              error: "Missing productId",
+            };
+          }
+
+          const ebook = await eBookModel.findById(item.productId);
+          return {
+            productId: item.productId,
+            exists: !!ebook,
+            title: ebook?.title || "Unknown",
+            hasS3Key: !!ebook?.s3Key,
+            error: !ebook
+              ? "eBook not found"
+              : !ebook.s3Key
+              ? "S3 key missing"
+              : null,
+          };
+        } catch (error) {
+          console.error(`Error validating eBook ${item.productId}:`, error);
+          return {
+            productId: item.productId,
+            exists: false,
+            title: "Unknown",
+            hasS3Key: false,
+            error: error.message,
+          };
+        }
+      })
+    );
+
+    console.log("🔍 eBook validation results:", ebookValidation);
+
+    const invalidEbooks = ebookValidation.filter(
+      (ebook) => !ebook.exists || !ebook.hasS3Key
+    );
+    if (invalidEbooks.length > 0) {
+      console.error("❌ Invalid eBooks found:", invalidEbooks);
+      const errorDetails = invalidEbooks
+        .map((ebook) => `${ebook.productId}: ${ebook.error}`)
+        .join(", ");
+      throw new Error(`Invalid eBooks found: ${errorDetails}`);
+    }
+
     // Generate signed URLs for each eBook
     const ebookDownloads = await Promise.all(
       ebookItems.map(async (item) => {
-        // Get eBook details from database
-        const ebook = await eBookModel.findById(item.productId);
-        if (!ebook) {
-          throw new Error(`eBook not found: ${item.productId}`);
-        }
+        try {
+          console.log(`🔍 Looking up eBook in database: ${item.productId}`);
+          const ebook = await eBookModel.findById(item.productId);
 
-        const signedUrl = await generateSignedS3Url(ebook.s3Key);
-        return {
-          title: ebook.title,
-          author: ebook.author,
-          downloadUrl: signedUrl,
-          format: ebook.format,
-          fileSize: ebook.fileSize,
-          expiresIn: "24 hours",
-        };
+          if (!ebook) {
+            throw new Error(`eBook not found: ${item.productId}`);
+          }
+
+          console.log(`✅ Found eBook: ${ebook.title}`);
+
+          if (!ebook.s3Key) {
+            throw new Error(`S3 key not found for eBook: ${ebook.title}`);
+          }
+
+          console.log(`🔗 Generating signed URL for: ${ebook.title}`);
+          const signedUrl = await generateSignedS3Url(ebook.s3Key);
+          console.log(`✅ Generated signed URL for: ${ebook.title}`);
+
+          return {
+            title: ebook.title,
+            author: ebook.author,
+            downloadUrl: signedUrl,
+            format: ebook.format || "PDF",
+            fileSize: formatFileSize(ebook.fileSize) || "Unknown",
+            expiresIn: "24 hours",
+          };
+        } catch (error) {
+          console.error(`❌ Error processing eBook ${item.productId}:`, error);
+          throw new Error(
+            `Failed to process eBook ${item.productId}: ${error.message}`
+          );
+        }
       })
     );
 
     // Send email with download links
+    console.log(`📧 Sending email to ${customer.email}`);
     await sendDownloadEmail(
       customer.email,
       customer.firstName,
@@ -240,28 +402,51 @@ const deliverEbooks = async (customer, ebookItems, orderId) => {
       orderId
     );
 
-    // Log delivery success (you might want to store this in your database)
-    console.log(`eBooks delivered for order ${orderId} to ${customer.email}`);
+    console.log(
+      `✅ eBooks delivered for order ${orderId} to ${customer.email}`
+    );
 
     return {
       success: true,
       delivered: ebookDownloads.length,
       orderId: orderId,
+      emailSent: true,
+      deliveredItems: ebookDownloads.map((ebook) => ({
+        title: ebook.title,
+        author: ebook.author,
+      })),
     };
   } catch (error) {
-    console.error("Error delivering eBooks:", error);
-    throw error;
+    console.error("❌ Error delivering eBooks:", error.message);
+    throw new Error(`eBook delivery failed: ${error.message}`);
   }
 };
 
-// Update uploadEbookToS3 function
+/**
+ * Upload eBook to S3
+ */
 async function uploadEbookToS3(file, title) {
   try {
+    // Validate inputs
+    if (!file) {
+      throw new Error("File is required");
+    }
+
     if (!file.buffer) {
       throw new Error("File buffer is undefined");
     }
 
-    const fileExtension = file.originalname.split(".").pop();
+    if (!title) {
+      throw new Error("Title is required");
+    }
+
+    if (!process.env.S3_BUCKET_NAME) {
+      throw new Error("S3_BUCKET_NAME environment variable is not set");
+    }
+
+    const fileExtension = file.originalname
+      ? file.originalname.split(".").pop()
+      : "pdf";
     const sanitizedTitle = title.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase();
     const s3Key = `ebooks/${sanitizedTitle}-${uuidv4()}.${fileExtension}`;
 
@@ -269,20 +454,27 @@ async function uploadEbookToS3(file, title) {
       Bucket: process.env.S3_BUCKET_NAME,
       Key: s3Key,
       Body: file.buffer,
-      ContentType: file.mimetype,
+      ContentType: file.mimetype || "application/pdf",
+      Metadata: {
+        "original-filename": file.originalname || "unknown",
+        "uploaded-at": new Date().toISOString(),
+      },
     };
 
     const command = new PutObjectCommand(uploadParams);
     await s3.send(command);
 
+    console.log(`✅ eBook uploaded to S3: ${s3Key}`);
+
     return {
       s3Key: s3Key,
       fileSize: formatFileSize(file.size),
       format: fileExtension.toUpperCase(),
+      bucket: process.env.S3_BUCKET_NAME,
     };
   } catch (error) {
-    console.error("S3 upload failed:", error);
-    throw new Error("eBook upload to S3 failed");
+    console.error("❌ S3 upload failed:", error.message);
+    throw new Error(`eBook upload to S3 failed: ${error.message}`);
   }
 }
 
@@ -291,4 +483,5 @@ module.exports = {
   generateSignedS3Url,
   sendDownloadEmail,
   uploadEbookToS3,
+  formatFileSize,
 };
