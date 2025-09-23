@@ -7,10 +7,12 @@ const {
   increaseQuantity,
   decreaseQuantity,
   getCartTotal,
+  clearCart,
 } = require("../controllers/cartController");
 
 // Add to cart
 router.post("/cart", addToCart);
+router.delete("/clear", clearCart);
 
 // Get user cart
 router.get("/cart/:userId", getCart);
