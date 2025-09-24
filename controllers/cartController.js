@@ -292,7 +292,8 @@ exports.updateQuantity = async (req, res) => {
 // ✅ Clear entire cart
 exports.clearCart = async (req, res) => {
   try {
-    const { userId } = req.body;
+    const { userId } = req.params;
+    console.log("clear cart called this is the userID ", userId);
 
     if (!userId) {
       return res.status(400).json({

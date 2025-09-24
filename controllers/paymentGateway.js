@@ -81,7 +81,7 @@ exports.orderPlace = async (req, res) => {
       },
     };
 
-    console.log("this is order place functions   ----> ", products);
+    // console.log("this is order place functions   ----> ", products);
 
     const cashfreeResponse = await cashfree.PGCreateOrder(orderData);
 
