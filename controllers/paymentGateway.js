@@ -680,3 +680,209 @@ setInterval(() => {
     }
   }
 }, 30 * 60 * 1000); // Run every 30 minutes
+
+/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////SHIPPING FEE CHARGES APIS////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+
+// Calculate Shipping Charges
+exports.calculateShippingCharges = async (req, res) => {
+  try {
+    const { pickup_postcode, delivery_postcode, cod = 0 } = req.body;
+
+    if (!pickup_postcode || !delivery_postcode) {
+      return res.status(400).json({
+        success: false,
+        message: "Pickup postcode and delivery postcode are required",
+      });
+    }
+
+    const authToken = await getShiprocketAuthToken();
+
+    const response = await axios.get(
+      `${
+        SHIPROCKET_CONFIG.BASE_URL
+      }/courier/serviceability/?pickup_postcode=${pickup_postcode}&delivery_postcode=${delivery_postcode}&cod=${cod}&weight=${2}`,
+      {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    console.log("✅ Shipping charges calculated successfully");
+
+    const shippingOptions =
+      response.data.data.available_courier_companies || [];
+
+    // Find the cheapest shipping option
+    let cheapestOption = null;
+    if (shippingOptions.length > 0) {
+      cheapestOption = shippingOptions.reduce((min, option) =>
+        parseFloat(option.rate) < parseFloat(min.rate) ? option : min
+      );
+    }
+
+    res.json({
+      success: true,
+      isServiceable: shippingOptions.length > 0,
+      shippingOptions: shippingOptions,
+      cheapestOption: cheapestOption,
+      message:
+        shippingOptions.length > 0
+          ? `Shipping available to ${delivery_postcode}`
+          : `No shipping service available to ${delivery_postcode}`,
+    });
+  } catch (error) {
+    console.error(
+      "❌ Shipping calculation error:",
+      error.response?.data || error.message
+    );
+
+    res.status(500).json({
+      success: false,
+      message:
+        error.response?.data?.message || "Failed to calculate shipping charges",
+      isServiceable: false,
+      shippingOptions: [],
+    });
+  }
+};
+
+// Verify Pincode Serviceability
+exports.verifyPincodeServiceability = async (req, res) => {
+  try {
+    const { pickup_postcode, delivery_postcode } = req.body;
+
+    if (!pickup_postcode || !delivery_postcode) {
+      return res.status(400).json({
+        success: false,
+        message: "Pickup postcode and delivery postcode are required",
+      });
+    }
+
+    const authToken = await getShiprocketAuthToken();
+
+    const response = await axios.get(
+      `${SHIPROCKET_CONFIG.BASE_URL}/courier/serviceability/?pickup_postcode=${pickup_postcode}&delivery_postcode=${delivery_postcode}&cod=0`,
+      {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const shippingOptions =
+      response.data.data.available_courier_companies || [];
+    const isServiceable = shippingOptions.length > 0;
+
+    console.log(
+      `✅ Pincode verification: ${delivery_postcode} is ${
+        isServiceable ? "serviceable" : "not serviceable"
+      }`
+    );
+
+    res.json({
+      success: true,
+      isServiceable: isServiceable,
+      availableCouriers: shippingOptions.map((option) => ({
+        name: option.courier_name,
+        rate: option.rate,
+        estimatedDays: option.estimated_days,
+      })),
+      message: isServiceable
+        ? `Service available to ${delivery_postcode}`
+        : `No service available to ${delivery_postcode}`,
+    });
+  } catch (error) {
+    console.error(
+      "❌ Pincode verification error:",
+      error.response?.data || error.message
+    );
+
+    res.status(500).json({
+      success: false,
+      message:
+        error.response?.data?.message ||
+        "Failed to verify pincode serviceability",
+      isServiceable: false,
+      availableCouriers: [],
+    });
+  }
+};
+
+// Get Cheapest Shipping Option
+exports.getCheapestShippingOption = async (req, res) => {
+  try {
+    const { pickup_postcode, delivery_postcode, cod = 0 } = req.body;
+
+    if (!pickup_postcode || !delivery_postcode) {
+      return res.status(400).json({
+        success: false,
+        message: "Pickup postcode and delivery postcode are required",
+      });
+    }
+
+    const authToken = await getShiprocketAuthToken();
+
+    const response = await axios.get(
+      `${SHIPROCKET_CONFIG.BASE_URL}/courier/serviceability/?pickup_postcode=${pickup_postcode}&delivery_postcode=${delivery_postcode}&cod=${cod}`,
+      {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    const shippingOptions =
+      response.data.data.available_courier_companies || [];
+
+    if (shippingOptions.length === 0) {
+      return res.json({
+        success: true,
+        isServiceable: false,
+        message: "No shipping options available for this pincode",
+        cheapestOption: null,
+      });
+    }
+
+    // Find the cheapest shipping option
+    const cheapestOption = shippingOptions.reduce((min, option) =>
+      parseFloat(option.rate) < parseFloat(min.rate) ? option : min
+    );
+
+    console.log(
+      "✅ Cheapest shipping option found:",
+      cheapestOption.courier_name,
+      cheapestOption.rate
+    );
+
+    res.json({
+      success: true,
+      isServiceable: true,
+      cheapestOption: {
+        courierCompanyId: cheapestOption.courier_company_id,
+        courierName: cheapestOption.courier_name,
+        rate: cheapestOption.rate,
+        estimatedDays: cheapestOption.estimated_days,
+      },
+      allOptions: shippingOptions.length,
+    });
+  } catch (error) {
+    console.error(
+      "❌ Cheapest shipping calculation error:",
+      error.response?.data || error.message
+    );
+
+    res.status(500).json({
+      success: false,
+      message:
+        error.response?.data?.message ||
+        "Failed to calculate cheapest shipping option",
+      isServiceable: false,
+      cheapestOption: null,
+    });
+  }
+};
