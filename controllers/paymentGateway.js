@@ -66,8 +66,8 @@ exports.orderPlace = async (req, res) => {
         customer_phone: customer.phone,
       },
       order_meta: {
-        return_url: `https://novelez-prod.netlify.app/payment-success?order_id=${orderId}`,
-        // return_url: `https://novelez-prod.netlify.app/payment-success?order_id=${await getOrderId()}`,
+        // return_url: `https://novelez-prod.netlify.app/payment-success?order_id=${orderId}`,
+        return_url: `https://novelez-prod.netlify.app/payment-success?order_id=${await getOrderId()}`,
       },
       cart_details: {
         cart_items: [
