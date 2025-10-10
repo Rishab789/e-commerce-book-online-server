@@ -13,7 +13,7 @@ const {
 } = require("../services/shipmentServices");
 
 const cashfree = new Cashfree(
-  CFEnvironment.SANDBOX,
+  CFEnvironment.PRODUCTION,
   process.env.CLIENT_ID,
   process.env.CLIENT_SECRET
 );
