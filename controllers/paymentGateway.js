@@ -297,7 +297,10 @@ async function createShiprocketOrder(orderData, customer, products) {
       giftwrap_charges: 0,
       transaction_charges: 0,
       total_discount: 0,
-      sub_total: 9000,
+      sub_total: products.reduce(
+        (total, product) => total + product.price * product.quantity,
+        0
+      ),
       length: 10,
       breadth: 15,
       height: 20,
