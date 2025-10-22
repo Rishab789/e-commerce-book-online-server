@@ -304,7 +304,7 @@ async function createShiprocketOrder(orderData, customer, products) {
       length: 10,
       breadth: 15,
       height: 20,
-      weight: 2.5,
+      weight: 0.2,
     });
 
     const response = await axios.post(
